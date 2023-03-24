@@ -244,11 +244,11 @@
                             "microsoftsentinel": {
                                     "connectionId": "[resourceId('Microsoft.Web/connections', variables('ManagedIdentityConnectionName'))]",
                                     "connectionName": "[variables('ManagedIdentityConnectionName')]",
-                                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]",
                                     "connectionProperties": {
                                         "authentication": {
                                             "type": "ManagedServiceIdentity"
-                                    }
+                                    },
+                                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]"
                                 }
                             }
                         }
