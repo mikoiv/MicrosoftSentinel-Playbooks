@@ -240,6 +240,15 @@
                                     "connectionId": "[resourceId('Microsoft.Web/connections', variables('AzureSentinelConnectionName'))]",
                                     "connectionName": "[variables('AzureSentinelConnectionName')]",
                                     "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]"
+                                },
+                            "microsoftsentinel": {
+                                    "connectionId": "[resourceId('Microsoft.Web/connections', variables('ManagedIdentityConnectionName'))]",
+                                    "connectionName": "[variables('ManagedIdentityConnectionName')]",
+                                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]",
+                                    "connectionProperties": {
+                                        "authentication": {
+                                            "type": "ManagedServiceIdentity"
+                                    }
                                 }
                             }
                         }
