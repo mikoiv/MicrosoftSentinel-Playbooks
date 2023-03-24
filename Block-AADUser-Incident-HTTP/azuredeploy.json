@@ -16,22 +16,24 @@
         "PlaybookName": {
             "defaultValue": "Block-AADUser-Incident-HTTPn",
             "type": "string"
-        },
-        "workflows_Block_AADUser_Incident_HTTP_name": {
-            "defaultValue": "Block-AADUser-Incident-HTTP",
-            "type": "string"
-        },
-        "connections_azuresentinel_externalid": {
-            "defaultValue": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/resourceGroups/rg-logs-sec-002/providers/Microsoft.Web/connections/azuresentinel",
-            "type": "string"
-        },
-        "connections_microsoftsentinel_Block_AADUser_Incident_externalid": {
-            "defaultValue": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/resourceGroups/rg-logs-sec-002/providers/Microsoft.Web/connections/microsoftsentinel-Block-AADUser-Incident",
-            "type": "string"
         }
     },
-    "variables": {},
+    "variables": {
+        "AzureSentinelConnectionName": "[concat('azuresentinel-', parameters('PlaybookName'))]"
+    },
     "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('AzureSentinelConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]"
+                }
+            }
+        }, 
         {
             "type": "Microsoft.Logic/workflows",
             "apiVersion": "2017-07-01",
