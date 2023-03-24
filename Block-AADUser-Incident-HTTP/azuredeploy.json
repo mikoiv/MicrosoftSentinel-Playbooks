@@ -1,0 +1,261 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "title": "Block-AADUser-Incident-HTTP",
+        "description": "This playbook disables Azure AD users with HTTP actions and uses a Managed Identity.",
+        "lastUpdateTime": "2021-12-16T00:00:00.000Z",
+        "support": {
+            "tier": "community"
+        },
+        "author": {
+            "name": "Mikko Koivunen"
+        }
+    },
+    "parameters": {
+        "PlaybookName": {
+            "defaultValue": "Block-AADUser-Incident-HTTPn",
+            "type": "string"
+        }
+        "workflows_Block_AADUser_Incident_HTTP_name": {
+            "defaultValue": "Block-AADUser-Incident-HTTP",
+            "type": "String"
+        },
+        "connections_azuresentinel_externalid": {
+            "defaultValue": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/resourceGroups/rg-logs-sec-002/providers/Microsoft.Web/connections/azuresentinel",
+            "type": "String"
+        },
+        "connections_microsoftsentinel_Block_AADUser_Incident_externalid": {
+            "defaultValue": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/resourceGroups/rg-logs-sec-002/providers/Microsoft.Web/connections/microsoftsentinel-Block-AADUser-Incident",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_Block_AADUser_Incident_HTTP_name')]",
+            "location": "northeurope",
+            "tags": {
+                "LogicAppsCategory": "security",
+                "hidden-SentinelTemplateName": "Block-AADUser",
+                "hidden-SentinelTemplateVersion": "1.1",
+                "hidden-SentinelWorkspaceId": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/resourceGroups/rg-logs-sec-002/providers/microsoft.OperationalInsights/Workspaces/law-bagend-sec-002"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Microsoft_Sentinel_incident": {
+                            "type": "ApiConnectionWebhook",
+                            "inputs": {
+                                "body": {
+                                    "callback_url": "@{listCallbackUrl()}"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                    }
+                                },
+                                "path": "/incident-creation"
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Entities_-_Get_Accounts": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/entities/account"
+                            }
+                        },
+                        "For_each": {
+                            "foreach": "@body('Entities_-_Get_Accounts')?['Accounts']",
+                            "actions": {
+                                "Condition_-_check_if_user_found_in_AAD": {
+                                    "actions": {
+                                        "Condition_-_check_if_disabling_succeeded": {
+                                            "actions": {
+                                                "Add_comment_to_incident_-_user_was_disabled": {
+                                                    "runAfter": {},
+                                                    "type": "ApiConnection",
+                                                    "inputs": {
+                                                        "body": {
+                                                            "incidentArmId": "@triggerBody()?['object']?['id']",
+                                                            "message": "<p>User @{items('For_each')?['Name']} (UPN - @{concat(items('For_each')?['Name'], '@', items('for_each')?['UPNSuffix'])}) was disabled in AAD via playbook Block-AADUser-HTTP.&nbsp;</p>"
+                                                        },
+                                                        "host": {
+                                                            "connection": {
+                                                                "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                                            }
+                                                        },
+                                                        "method": "post",
+                                                        "path": "/Incidents/Comment"
+                                                    }
+                                                }
+                                            },
+                                            "runAfter": {
+                                                "HTTP_-_disable_user": [
+                                                    "Succeeded",
+                                                    "Failed"
+                                                ]
+                                            },
+                                            "else": {
+                                                "actions": {
+                                                    "Add_comment_to_incident_-_Could_not_disable": {
+                                                        "runAfter": {},
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "body": {
+                                                                "incidentArmId": "@triggerBody()?['object']?['id']",
+                                                                "message": "<p>Block-AADUser-HTTP playbook was instructed to disable this user but could not do it. User has Administrative roles.<br>\n<br>\n@{items('For_each')?['Name']} (UPN - @{concat(items('For_each')?['Name'], '@', items('for_each')?['UPNSuffix'])})</p>"
+                                                            },
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "post",
+                                                            "path": "/Incidents/Comment"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "expression": {
+                                                "and": [
+                                                    {
+                                                        "equals": [
+                                                            "@outputs('HTTP_-_disable_user')['statusCode']",
+                                                            204
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "type": "If"
+                                        },
+                                        "HTTP_-_disable_user": {
+                                            "runAfter": {},
+                                            "type": "Http",
+                                            "inputs": {
+                                                "authentication": {
+                                                    "audience": "https://graph.microsoft.com/",
+                                                    "type": "ManagedServiceIdentity"
+                                                },
+                                                "body": {
+                                                    "accountEnabled": false
+                                                },
+                                                "method": "PATCH",
+                                                "uri": "https://graph.microsoft.com/v1.0/users/@{concat(items('For_each')?['Name'], '@', items('for_each')?['UPNSuffix'])}"
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "HTTP_get_user": [
+                                            "Succeeded",
+                                            "Failed"
+                                        ]
+                                    },
+                                    "else": {
+                                        "actions": {
+                                            "Add_comment_to_incident_-_user_not_found": {
+                                                "runAfter": {},
+                                                "type": "ApiConnection",
+                                                "inputs": {
+                                                    "body": {
+                                                        "incidentArmId": "@triggerBody()?['object']?['id']",
+                                                        "message": "<p>Block-AADUser-HTTP playbook was instructed to disable this user, but could not find it in Azure AD: <br>\n<br>\n@{items('For_each')?['Name']} (UPN - @{concat(items('For_each')?['Name'], '@', items('for_each')?['UPNSuffix'])})<br>\n</p>"
+                                                    },
+                                                    "host": {
+                                                        "connection": {
+                                                            "name": "@parameters('$connections')['microsoftsentinel']['connectionId']"
+                                                        }
+                                                    },
+                                                    "method": "post",
+                                                    "path": "/Incidents/Comment"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    "@outputs('HTTP_get_user')['statusCode']",
+                                                    200
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                },
+                                "HTTP_get_user": {
+                                    "runAfter": {},
+                                    "type": "Http",
+                                    "inputs": {
+                                        "authentication": {
+                                            "audience": "https://graph.microsoft.com/",
+                                            "type": "ManagedServiceIdentity"
+                                        },
+                                        "method": "GET",
+                                        "uri": "https://graph.microsoft.com/v1.0/users/@{concat(items('For_each')?['Name'], '@', items('for_each')?['UPNSuffix'])}"
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Entities_-_Get_Accounts": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        }
+                    }
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azuresentinel": {
+                                "connectionId": "[parameters('connections_azuresentinel_externalid')]",
+                                "connectionName": "azuresentinel",
+                                "connectionProperties": {
+                                    "authentication": {
+                                        "type": "ManagedServiceIdentity"
+                                    }
+                                },
+                                "id": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/providers/Microsoft.Web/locations/northeurope/managedApis/azuresentinel"
+                            },
+                            "microsoftsentinel": {
+                                "connectionId": "[parameters('connections_microsoftsentinel_Block_AADUser_Incident_externalid')]",
+                                "connectionName": "microsoftsentinel-Block-AADUser-Incident",
+                                "connectionProperties": {
+                                    "authentication": {
+                                        "type": "ManagedServiceIdentity"
+                                    }
+                                },
+                                "id": "/subscriptions/344069f7-f0ad-4096-ac05-4ba2e425a900/providers/Microsoft.Web/locations/northeurope/managedApis/azuresentinel"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
