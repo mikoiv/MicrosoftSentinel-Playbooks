@@ -33,7 +33,8 @@
                 "customParameterValues": {},
                 "api": {
                     "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]"
-                }
+                },
+                "parameterValueType": "Alternative"
             }
         }, 
         {
@@ -247,9 +248,9 @@
                                     "connectionProperties": {
                                         "authentication": {
                                             "type": "ManagedServiceIdentity"
+                                        }
                                     },
-                                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]"
-                                }
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]"
                             }
                         }
                     }
