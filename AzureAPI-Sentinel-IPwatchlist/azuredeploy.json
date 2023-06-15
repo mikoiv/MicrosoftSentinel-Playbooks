@@ -5,6 +5,22 @@
         "PlaybookName":  {
             "defaultValue":  "AzureAPI-Sentinel-IPwatchlist",
             "type":  "string"
+        },
+        "SentinelSubscriptionId": {
+            "defaultValue": "<your Microsoft Sentinel Azure subscription ID here>",
+            "type": "string"
+        },
+        "SentinelResourceGroup": {
+            "defaultValue": "<your Microsoft Sentinel Azure Resource Group name here>",
+            "type": "string"
+        },    
+        "SentinelWorkspaceId": {
+            "defaultValue": "<your Microsoft Sentinel Log Analytics Workspace ID>",
+            "type": "string"
+        },
+        "SentinelWatchlistAlias": {
+            "defaultValue": "azurepip",
+            "type": "string"
         }
     },
     "variables":  {
@@ -103,7 +119,7 @@
                                     {
                                         "name":  "subscriptionId",
                                         "type":  "string",
-                                        "value":  "2fa41b95-1ce7-462e-aa0a-7fb1cfc1a82c"
+                                        "value":  "[parameters('SentinelSubscriptionId')]"
                                     }
                                 ]
                             }
@@ -120,7 +136,7 @@
                                     {
                                         "name":  "watchlistAlias",
                                         "type":  "string",
-                                        "value":  "azurepip"
+                                        "value":  "[parameters('SentinelWatchlistAlias')]"
                                     }
                                 ]
                             }
@@ -137,7 +153,7 @@
                                     {
                                         "name":  "workspaceId",
                                         "type":  "string",
-                                        "value":  "cd0d2926-6eba-48b7-b169-e547fdbb4495"
+                                        "value":  "[parameters('SentinelWorkspaceId')]"
                                     }
                                 ]
                             }
@@ -154,7 +170,7 @@
                                     {
                                         "name":  "workspaceRg",
                                         "type":  "string",
-                                        "value":  "rg-sentinel-prod"
+                                        "value":  "[parameters('SentinelResourceGroup')]"
                                     }
                                 ]
                             }
