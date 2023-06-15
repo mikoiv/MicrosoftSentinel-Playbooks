@@ -1,0 +1,309 @@
+{
+    "$schema":  "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion":  "1.0.0.0",
+    "parameters":  {
+        "PlaybookName":  {
+            "defaultValue":  "AzureAPI-Sentinel-IPwatchlist",
+            "type":  "string"
+        }
+    },
+    "variables":  {
+        "MicrosoftSentinelConnectionName":  "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]"
+    },
+    "resources":  [
+        {
+            "properties":  {
+                "provisioningState":  "Succeeded",
+                "state":  "Enabled",
+                "definition":  {
+                    "$schema":  "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion":  "1.0.0.0",
+                    "parameters":  {
+                        "$connections":  {
+                            "defaultValue":  {
+                            },
+                            "type":  "Object"
+                        }
+                    },
+                    "triggers":  {
+                        "Recurrence_-_daily":  {
+                            "recurrence":  {
+                                "frequency":  "Day",
+                                "interval":  1
+                            },
+                            "evaluatedRecurrence":  {
+                                "frequency":  "Day",
+                                "interval":  1
+                            },
+                            "type":  "Recurrence"
+                        }
+                    },
+                    "actions":  {
+                        "Create_CSV_table_-_from_query_results":  {
+                            "runAfter":  {
+                                "Parse_JSON_-_parse_query_result":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "Table",
+                            "inputs":  {
+                                "columns":  [
+                                    {
+                                        "header":  "subscriptionId",
+                                        "value":  "@item()?['subscriptionId']"
+                                    },
+                                    {
+                                        "header":  "resourceGroup",
+                                        "value":  "@item()?['resourceGroup']"
+                                    },
+                                    {
+                                        "header":  "ipName",
+                                        "value":  "@item()?['name']"
+                                    },
+                                    {
+                                        "header":  "ipAddr",
+                                        "value":  "@item()?['properties_ipAddress']"
+                                    }
+                                ],
+                                "format":  "CSV",
+                                "from":  "@body('Parse_JSON_-_parse_query_result')?['data']"
+                            }
+                        },
+                        "HTTP_POST_-_query_Resource_Graph_for_Public_IPs":  {
+                            "runAfter":  {
+                                "Initialize_variable_-_watchlistAlias":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "Http",
+                            "inputs":  {
+                                "authentication":  {
+                                    "audience":  "https://management.azure.com/",
+                                    "type":  "ManagedServiceIdentity"
+                                },
+                                "body":  {
+                                    "query":  "Resources | where type contains 'publicIPAddresses' and isnotempty(properties.ipAddress) | project subscriptionId, name, resourceGroup, location, properties.ipAddress"
+                                },
+                                "headers":  {
+                                    "Content-Type":  "application/json"
+                                },
+                                "method":  "POST",
+                                "queries":  {
+                                    "api-version":  "2021-03-01"
+                                },
+                                "uri":  "https://management.azure.com/providers/Microsoft.ResourceGraph/resources"
+                            }
+                        },
+                        "Initialize_variable_-_subscriptionId":  {
+                            "runAfter":  {
+                            },
+                            "type":  "InitializeVariable",
+                            "inputs":  {
+                                "variables":  [
+                                    {
+                                        "name":  "subscriptionId",
+                                        "type":  "string",
+                                        "value":  "2fa41b95-1ce7-462e-aa0a-7fb1cfc1a82c"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_-_watchlistAlias":  {
+                            "runAfter":  {
+                                "Initialize_variable_-_workspaceRg":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "InitializeVariable",
+                            "inputs":  {
+                                "variables":  [
+                                    {
+                                        "name":  "watchlistAlias",
+                                        "type":  "string",
+                                        "value":  "azurepip"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_-_workspaceId":  {
+                            "runAfter":  {
+                                "Initialize_variable_-_subscriptionId":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "InitializeVariable",
+                            "inputs":  {
+                                "variables":  [
+                                    {
+                                        "name":  "workspaceId",
+                                        "type":  "string",
+                                        "value":  "cd0d2926-6eba-48b7-b169-e547fdbb4495"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_-_workspaceRg":  {
+                            "runAfter":  {
+                                "Initialize_variable_-_workspaceId":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "InitializeVariable",
+                            "inputs":  {
+                                "variables":  [
+                                    {
+                                        "name":  "workspaceRg",
+                                        "type":  "string",
+                                        "value":  "rg-sentinel-prod"
+                                    }
+                                ]
+                            }
+                        },
+                        "Parse_JSON_-_parse_query_result":  {
+                            "runAfter":  {
+                                "HTTP_POST_-_query_Resource_Graph_for_Public_IPs":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "ParseJson",
+                            "inputs":  {
+                                "content":  "@body('HTTP_POST_-_query_Resource_Graph_for_Public_IPs')",
+                                "schema":  {
+                                    "properties":  {
+                                        "count":  {
+                                            "type":  "integer"
+                                        },
+                                        "data":  {
+                                            "items":  {
+                                                "properties":  {
+                                                    "name":  {
+                                                        "type":  "string"
+                                                    },
+                                                    "properties_ipAddress":  {
+                                                        "type":  "string"
+                                                    },
+                                                    "resourceGroup":  {
+                                                        "type":  "string"
+                                                    },
+                                                    "subscriptionId":  {
+                                                        "type":  "string"
+                                                    }
+                                                },
+                                                "required":  [
+                                                    "subscriptionId",
+                                                    "name",
+                                                    "resourceGroup",
+                                                    "properties_ipAddress"
+                                                ],
+                                                "type":  "object"
+                                            },
+                                            "type":  "array"
+                                        },
+                                        "facets":  {
+                                            "type":  "array"
+                                        },
+                                        "resultTruncated":  {
+                                            "type":  "string"
+                                        },
+                                        "totalRecords":  {
+                                            "type":  "integer"
+                                        }
+                                    },
+                                    "type":  "object"
+                                }
+                            }
+                        },
+                        "Watchlists_-_create_new_Watchlist_with_current_data":  {
+                            "runAfter":  {
+                                "Watchlists_-_delete_old_Watchlist":  [
+                                    "Succeeded",
+                                    "Failed"
+                                ]
+                            },
+                            "type":  "ApiConnection",
+                            "inputs":  {
+                                "body":  {
+                                    "description":  "All Public IPs currently existing in this Azure tenant. List is refreshed daily with Logic App.",
+                                    "displayName":  "Azure Public IPs",
+                                    "itemsSearchKey":  "ipAddr",
+                                    "rawContent":  "@{body('Create_CSV_table_-_from_query_results')}",
+                                    "source":  "Playbook"
+                                },
+                                "host":  {
+                                    "connection":  {
+                                        "name":  "@parameters('$connections')['azuresentinel_1']['connectionId']"
+                                    }
+                                },
+                                "method":  "put",
+                                "path":  "/Watchlists/subscriptions/@{encodeURIComponent(variables('subscriptionId'))}/resourceGroups/@{encodeURIComponent(variables('workspaceRg'))}/workspaces/@{encodeURIComponent(variables('workspaceId'))}/watchlists/@{encodeURIComponent(variables('watchlistAlias'))}"
+                            }
+                        },
+                        "Watchlists_-_delete_old_Watchlist":  {
+                            "runAfter":  {
+                                "Create_CSV_table_-_from_query_results":  [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type":  "ApiConnection",
+                            "inputs":  {
+                                "host":  {
+                                    "connection":  {
+                                        "name":  "@parameters('$connections')['azuresentinel_1']['connectionId']"
+                                    }
+                                },
+                                "method":  "delete",
+                                "path":  "/Watchlists/subscriptions/@{encodeURIComponent(variables('subscriptionId'))}/resourceGroups/@{encodeURIComponent(variables('workspaceRg'))}/workspaces/@{encodeURIComponent(variables('workspaceId'))}/watchlists/@{encodeURIComponent(variables('watchlistAlias'))}"
+                            }
+                        }
+                    },
+                    "outputs":  {
+                    }
+                },
+                "parameters":  {
+                    "$connections":  {
+                        "value":  {
+                            "azuresentinel_1":  {
+                                "connectionId":  "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                                "connectionName":  "[variables('MicrosoftSentinelConnectionName')]",
+                                "id":  "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+                                "connectionProperties":  {
+                                    "authentication":  {
+                                        "type":  "ManagedServiceIdentity"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "name":  "[parameters('PlaybookName')]",
+            "type":  "Microsoft.Logic/workflows",
+            "location":  "[resourceGroup().location]",
+            "tags":  {
+            },
+            "identity":  {
+                "type":  "SystemAssigned"
+            },
+            "apiVersion":  "2017-07-01",
+            "dependsOn":  [
+                "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]"
+            ]
+        },
+        {
+            "type":  "Microsoft.Web/connections",
+            "apiVersion":  "2016-06-01",
+            "name":  "[variables('MicrosoftSentinelConnectionName')]",
+            "location":  "[resourceGroup().location]",
+            "kind":  "V1",
+            "properties":  {
+                "displayName":  "[variables('MicrosoftSentinelConnectionName')]",
+                "customParameterValues":  {
+                },
+                "parameterValueType":  "Alternative",
+                "api":  {
+                    "id":  "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+                }
+            }
+        }
+    ]
+}
